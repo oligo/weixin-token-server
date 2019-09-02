@@ -1,0 +1,7 @@
+credential:
+  appId: wx-appid-example
+  appSecret: wx-app-secret-example
+
+# how often to check expiration time of access token
+check:
+  interval: 10s
