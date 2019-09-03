@@ -23,7 +23,9 @@ func getAccessToken(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	encoder := json.NewEncoder(w)
 
-	if appId := params.Get("appId"); len(appId) <= 0 {
+	w.Header().Set("Content-Type", "application/json;charset=utf-8")
+
+	if appId := params.Get("appId"); len(appId) <= 0 || appId != cred.appId {
 		encoder.Encode(map[string]interface{}{
 			"error": "missing appId",
 		})

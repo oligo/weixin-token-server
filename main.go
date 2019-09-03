@@ -15,6 +15,7 @@ import (
 
 var (
 	appHome     string
+	cred        *wechatCredential
 	accessToken *WechatAccessToken
 	signalChan  chan os.Signal
 )
@@ -28,7 +29,7 @@ func init() {
 
 func main() {
 
-	cred := &wechatCredential{
+	cred = &wechatCredential{
 		appId:     viper.GetString("credential.appId"),
 		appSecret: viper.GetString("credential.appSecret"),
 	}
