@@ -7,4 +7,5 @@ RUN GOOS=linux go build -o token-server .
 FROM alpine
 RUN apk add --no-cache ca-certificates
 COPY --from=0 /wechat-token-server/token-server /usr/bin
+EXPOSE 8080/tcp
 ENTRYPOINT ["token-server"]
