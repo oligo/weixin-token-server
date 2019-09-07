@@ -42,6 +42,10 @@ func newAccessTokenHolder(cred *wechatCredential, interval time.Duration) *Acces
 }
 
 func (t *AccessTokenHolder) ExpiresIn() time.Duration {
+	if t.UpdatedAt.IsZero() {
+		return 0
+	}
+
 	return (time.Duration(t.ExpireTime*1000*1000*1000) - time.Since(t.UpdatedAt)).Round(time.Second)
 }
 
