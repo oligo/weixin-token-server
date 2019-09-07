@@ -104,7 +104,8 @@ func (t *AccessTokenHolder) queryForToken() error {
 
 	// 读取access_token
 	if _, ok := respMap["access_token"]; !ok {
-		log.Fatalf("Failed to update access token, errcode: %v, errmsg: %s\n", respMap["errcode"], respMap["errmsg"].(string))
+		log.Printf("failed to update access token, errcode: %v, errmsg: %s\n", respMap["errcode"], respMap["errmsg"].(string))
+		t.AccessToken = &AccessToken{}
 		return nil
 	}
 
@@ -140,8 +141,9 @@ func (p *AccessTokenPool) Put(holder *AccessTokenHolder) error {
 	// load previous saved token from token store
 	token, err := p.store.Load(holder.cred.AppID)
 	if err != nil {
-		return err
+		log.Printf("loading token from token store failed: %v", err)
 	}
+
 	holder.AccessToken = token
 
 	p.pool[holder.cred.AppID] = holder

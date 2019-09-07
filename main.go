@@ -39,10 +39,16 @@ func main() {
 		log.Fatalln("load config failed")
 	}
 
+	log.Println(credentials)
+
 	for _, cred := range credentials {
 		log.Printf("loading %s\n", cred.AppID)
 		holder := newAccessTokenHolder(&cred, viper.GetDuration("check.interval"))
-		pool.Put(holder)
+		err = pool.Put(holder)
+		if err != nil {
+			panic(err)
+		}
+
 		go func() {
 			holder.Tick()
 		}()
