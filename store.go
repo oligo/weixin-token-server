@@ -76,7 +76,7 @@ func (d *DiskStore) loadAll() (map[string]AccessToken, error) {
 	defer file.Close()
 
 	tokenMap := make(map[string]AccessToken)
-	json.NewDecoder(file).Decode(tokenMap)
+	json.NewDecoder(file).Decode(&tokenMap)
 
 	return tokenMap, nil
 }

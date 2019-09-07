@@ -23,6 +23,7 @@ var (
 )
 
 func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	signalChan = make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	initHome()
@@ -39,11 +40,9 @@ func main() {
 		log.Fatalln("load config failed")
 	}
 
-	log.Println(credentials)
-
 	for _, cred := range credentials {
 		log.Printf("loading %s\n", cred.AppID)
-		holder := newAccessTokenHolder(&cred, viper.GetDuration("check.interval"))
+		holder := newAccessTokenHolder(cred, viper.GetDuration("check.interval"))
 		err = pool.Put(holder)
 		if err != nil {
 			panic(err)
@@ -60,30 +59,26 @@ func main() {
 		log.Println("Listening on http://0.0.0.0:8080")
 
 		if err := server.ListenAndServe(); err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 	}()
 
-	hook := Hook{sigChan: signalChan}
+	<-signalChan
+	log.Println("process interrupted...")
+	log.Println("shutting down the access token server")
+	pool.Close()
 
-	hook.register(func() {
-		log.Println("Shutting down the access token server")
-
-		ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-		server.Shutdown(ctx)
-	})
-
-	hook.register(func() {
-		pool.Close()
-	})
-
-	hook.listen()
-
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = server.Shutdown(ctx)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func loadConfig() {
 	viper.SetConfigName("config")
-	viper.AddConfigPath("$HOME/.token-server")
+	viper.AddConfigPath(appHome)
 	viper.AddConfigPath(".")
 
 	err := viper.ReadInConfig()

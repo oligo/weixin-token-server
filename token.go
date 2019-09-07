@@ -30,10 +30,10 @@ type AccessTokenHolder struct {
 	stopChan chan struct{}
 }
 
-func newAccessTokenHolder(cred *wechatCredential, interval time.Duration) *AccessTokenHolder {
+func newAccessTokenHolder(cred wechatCredential, interval time.Duration) *AccessTokenHolder {
 	t := &AccessTokenHolder{
 		ticker:   time.NewTicker(interval),
-		cred:     cred,
+		cred:     &cred,
 		stopChan: make(chan struct{}, 1),
 		mutex:    &sync.Mutex{},
 	}
@@ -58,12 +58,12 @@ func (t *AccessTokenHolder) Tick() {
 			t.mutex.Lock()
 			if t.ExpiresIn() < 3*60*time.Second {
 				t.queryForToken()
-				log.Println("access token refreshed")
+				log.Printf("access token for %s refreshed", t.cred.AppID)
 			}
 			t.mutex.Unlock()
 		case <-t.stopChan:
 			t.ticker.Stop()
-			log.Println("quit access token ticker")
+			log.Printf("[%s] quit access token ticker", t.cred.AppID)
 			return
 		}
 	}
@@ -77,9 +77,9 @@ func (t *AccessTokenHolder) Update() {
 
 	if t.AccessToken == nil || t.ExpiresIn() < 3*60*time.Second {
 		t.queryForToken()
-		log.Println("access token updated")
+		log.Printf("access token for %s updated\n", t.cred.AppID)
 	} else {
-		log.Println("no need to update")
+		log.Printf("no need to update for %s", t.cred.AppID)
 	}
 }
 
@@ -181,4 +181,6 @@ func (p *AccessTokenPool) Close() {
 	for _, holder := range p.pool {
 		holder.Close()
 	}
+
+	log.Println("all access tokens are saved")
 }

@@ -28,7 +28,7 @@ Key `access_token`为微信公众号的access token, `expires_in`是token的过�
 token-server的最新docker image已经push到Docker Hub, 搜索oligo/token-server即可找到。运行方式：
 
 ```shell
-  docker run -d -v "`pwd`/config.yml:/config.yml" -p '127.0.0.1:8080:8080' oligo/token-server
+  docker run -d -v "${HOME}/.token-server:/root/.token-server" -p '127.0.0.1:8080:8080' oligo/token-server
 ```
 
 ## Configuration
