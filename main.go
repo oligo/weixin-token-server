@@ -13,11 +13,13 @@ import (
 	"github.com/spf13/viper"
 )
 
+const diskStoreFile = "token.json"
+
 var (
-	appHome     string
-	cred        *wechatCredential
-	accessToken *WechatAccessToken
-	signalChan  chan os.Signal
+	appHome    string
+	cred       *wechatCredential
+	pool       *AccessTokenPool
+	signalChan chan os.Signal
 )
 
 func init() {
@@ -25,20 +27,26 @@ func init() {
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	initHome()
 	loadConfig()
+	pool = NewAccessTokenPool(NewDiskStore(path.Join(appHome, diskStoreFile)))
 }
 
 func main() {
 
-	cred = &wechatCredential{
-		appId:     viper.GetString("credential.appId"),
-		appSecret: viper.GetString("credential.appSecret"),
+	var credentials []wechatCredential
+
+	err := viper.UnmarshalKey("credentials", &credentials)
+	if err != nil {
+		log.Fatalln("load config failed")
 	}
 
-	accessToken = newAccessToken(cred, viper.GetDuration("check.interval"))
-
-	go func() {
-		accessToken.Tick()
-	}()
+	for _, cred := range credentials {
+		log.Printf("loading %s\n", cred.AppID)
+		holder := newAccessTokenHolder(&cred, viper.GetDuration("check.interval"))
+		pool.Put(holder)
+		go func() {
+			holder.Tick()
+		}()
+	}
 
 	server := newServer(":8080")
 
@@ -53,14 +61,14 @@ func main() {
 	hook := Hook{sigChan: signalChan}
 
 	hook.register(func() {
-		accessToken.Close()
-	})
-
-	hook.register(func() {
 		log.Println("Shutting down the access token server")
 
 		ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 		server.Shutdown(ctx)
+	})
+
+	hook.register(func() {
+		pool.Close()
 	})
 
 	hook.listen()

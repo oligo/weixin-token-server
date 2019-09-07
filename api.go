@@ -25,17 +25,28 @@ func getAccessToken(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
 
-	if appId := params.Get("appId"); len(appId) <= 0 || appId != cred.appId {
+	appID := params.Get("appId")
+
+	if len(appID) <= 0 {
 		encoder.Encode(map[string]interface{}{
 			"error": "missing appId",
 		})
 		return
 	}
 
+	tokenHolder, err := pool.Get(appID)
+	if err != nil {
+		log.Printf("[%s]: %v", appID, err)
+		encoder.Encode(map[string]interface{}{
+			"error": "get token failed",
+		})
+		return
+	}
+
 	encoder.Encode(
 		map[string]interface{}{
-			"access_token": accessToken.AccessToken,
-			"expires_in":   accessToken.ExpiresIn().Seconds(),
+			"access_token": tokenHolder.AccessToken.Token,
+			"expires_in":   tokenHolder.ExpiresIn().Seconds(),
 		})
 }
 

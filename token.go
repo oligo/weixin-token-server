@@ -2,67 +2,57 @@ package main
 
 import (
 	"encoding/json"
-	"io"
+	"errors"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
-	"path"
 	"sync"
 	"time"
 )
 
 type wechatCredential struct {
-	appId     string
-	appSecret string
+	AppID     string `mapstructure:"appId"`
+	AppSecret string `mapstructure:"appSecret"`
 }
 
-type WechatAccessToken struct {
-	AccessToken string    `json:"accessToken"`
-	ExpireTime  int       `json:"expireTime"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-	ticker      *time.Ticker
-	mutex       *sync.Mutex
-	cred        *wechatCredential
-	stopChan    chan struct{}
-	db          io.ReadWriteCloser
-	*json.Encoder
-	*json.Decoder
+type AccessToken struct {
+	AppID      string    `json:"appId"`
+	Token      string    `json:"accessToken"`
+	ExpireTime int       `json:"expireTime"`
+	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
-func newAccessToken(cred *wechatCredential, interval time.Duration) *WechatAccessToken {
-	t := &WechatAccessToken{
+type AccessTokenHolder struct {
+	*AccessToken
+	ticker   *time.Ticker
+	mutex    *sync.Mutex
+	cred     *wechatCredential
+	stopChan chan struct{}
+}
+
+func newAccessTokenHolder(cred *wechatCredential, interval time.Duration) *AccessTokenHolder {
+	t := &AccessTokenHolder{
 		ticker:   time.NewTicker(interval),
 		cred:     cred,
 		stopChan: make(chan struct{}, 1),
 		mutex:    &sync.Mutex{},
 	}
 
-	diskFile, err := os.OpenFile(path.Join(appHome, "token.json"), os.O_CREATE|os.O_RDWR, 0600)
-	if err != nil {
-		log.Printf("open token.json failed: %v\n", err)
-	}
-
-	t.db = diskFile
-	t.Encoder = json.NewEncoder(diskFile)
-	t.Decoder = json.NewDecoder(diskFile)
-
 	return t
 }
 
-func (t *WechatAccessToken) ExpiresIn() time.Duration {
+func (t *AccessTokenHolder) ExpiresIn() time.Duration {
 	return (time.Duration(t.ExpireTime*1000*1000*1000) - time.Since(t.UpdatedAt)).Round(time.Second)
 }
 
-func (t *WechatAccessToken) Tick() {
-	t.Decode(t)
+func (t *AccessTokenHolder) Tick() {
 	t.Update()
 
 	for {
 		select {
 		case <-t.ticker.C:
 			t.mutex.Lock()
-			if t.ExpiresIn() < 5*60*time.Second {
+			if t.ExpiresIn() < 3*60*time.Second {
 				t.queryForToken()
 				log.Println("access token refreshed")
 			}
@@ -77,11 +67,11 @@ func (t *WechatAccessToken) Tick() {
 }
 
 // Update force the update of wechat access token
-func (t *WechatAccessToken) Update() {
+func (t *AccessTokenHolder) Update() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	if t.UpdatedAt.IsZero() || t.ExpiresIn() < 5*60*time.Second {
+	if t.AccessToken == nil || t.ExpiresIn() < 3*60*time.Second {
 		t.queryForToken()
 		log.Println("access token updated")
 	} else {
@@ -90,14 +80,12 @@ func (t *WechatAccessToken) Update() {
 }
 
 // Close shutdown the tick cycles
-func (t *WechatAccessToken) Close() {
+func (t *AccessTokenHolder) Close() {
 	t.stopChan <- struct{}{}
-	t.Encode(t)
-	t.db.Close()
 }
 
-func (t *WechatAccessToken) queryForToken() error {
-	url := "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=" + t.cred.appId + "&secret=" + t.cred.appSecret
+func (t *AccessTokenHolder) queryForToken() error {
+	url := "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=" + t.cred.AppID + "&secret=" + t.cred.AppSecret
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -120,9 +108,71 @@ func (t *WechatAccessToken) queryForToken() error {
 		return nil
 	}
 
-	t.AccessToken = respMap["access_token"].(string)
-	t.ExpireTime = int(respMap["expires_in"].(float64))
-	t.UpdatedAt = time.Now()
+	t.AccessToken = &AccessToken{
+		AppID:      t.cred.AppID,
+		Token:      respMap["access_token"].(string),
+		ExpireTime: int(respMap["expires_in"].(float64)),
+		UpdatedAt:  time.Now(),
+	}
 
 	return nil
+}
+
+// AccessTokenPool manages all access token
+type AccessTokenPool struct {
+	pool  map[string]*AccessTokenHolder
+	store TokenStore
+}
+
+func NewAccessTokenPool(store TokenStore) *AccessTokenPool {
+	return &AccessTokenPool{
+		pool:  make(map[string]*AccessTokenHolder),
+		store: store,
+	}
+}
+
+// Put puts a new access token holder in the pool
+func (p *AccessTokenPool) Put(holder *AccessTokenHolder) error {
+	if holder.cred.AppID == "" {
+		return errors.New("no appId in credential")
+	}
+
+	// load previous saved token from token store
+	token, err := p.store.Load(holder.cred.AppID)
+	if err != nil {
+		return err
+	}
+	holder.AccessToken = token
+
+	p.pool[holder.cred.AppID] = holder
+
+	return nil
+}
+
+// Get gets a added access token holder from the pool
+func (p *AccessTokenPool) Get(appID string) (*AccessTokenHolder, error) {
+	holder, ok := p.pool[appID]
+	if !ok {
+		return nil, errors.New("access token holder not found for " + appID)
+	}
+
+	return holder, nil
+}
+
+func (p *AccessTokenPool) SaveAll() error {
+	tokens := make([]AccessToken, 0)
+	for _, holder := range p.pool {
+		tokens = append(tokens, *holder.AccessToken)
+	}
+
+	p.store.Save(tokens...)
+
+	return nil
+}
+
+func (p *AccessTokenPool) Close() {
+	p.SaveAll()
+	for _, holder := range p.pool {
+		holder.Close()
+	}
 }
