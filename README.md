@@ -57,4 +57,27 @@ token-server有一个简单的yaml配置文件，可以放置在`$HOME/.token-se
 
  如前面所讲到的，token-server在内部维护了token的状态，多节点部署时token的刷新不会同步，因此目前来说还不适合高可用的部署方式。推荐使用时使用一些进程管理器去管理token-server的生命周期，如果在容器环境下，如docker swarm/k8s，设置服务/容器失败重启就可以了。另外，access token的消费方也建议根据`expires_in`来合理的缓存之，这样可以避免频繁请求token-server, 也能应对部分token-server挂掉的场景（只有token-server能很快恢复）。
 
+## License
+
+MIT License
+
+Copyright (c) 2019 zj.zh
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
