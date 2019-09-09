@@ -1,6 +1,6 @@
-# 微信公众号access token server
+# 微信(wechat)公众号access token server
 
-在公众号开发时，经常需要管理微信Oauth2签发的access token, 这个项目提供的就是这样一个小的服务，开箱（容器）即用，非常适合微服务场景下部署。当前仅支持持久化到磁盘文件，未来可以考虑支持redis等外部存储。现阶段不支持HA，适合于中小项目或个人项目使用。
+在公众号开发时，经常需要管理微信Oauth2签发的access token, 这个项目提供的就是这样一个小的服务，开箱（容器）即用，非常适合微服务场景下部署。当前仅支持持久化到磁盘文件，未来可以考虑支持redis等外部存储。现阶段不支持HA，适合于中小项目或个人项目使用。
 
 ## Features
 
@@ -55,7 +55,7 @@ token-server有一个简单的yaml配置文件，可以放置在`$HOME/.token-se
 
  ## HA
 
- 如前面所讲到的，token-server在内部维护了token的状态，多节点部署时token的刷新不会同步，因此目前来说还不适合高可用的部署方式。推荐使用时使用一些进程管理器去管理token-server的生命周期，如果在容器环境下，如docker swarm/k8s，设置服务/容器失败重启就可以了。另外，access token的消费方也建议根据`expires_in`来合理的缓存之，这样可以避免频繁请求token-server, 也能应对部分token-server挂掉的场景（只有token-server能很快恢复）。
+ 如前面所讲到的，token-server在内部维护了token的状态，多节点部署时token的刷新不会同步，因此目前来说还不适合高可用的部署方式。推荐使用时使用一些进程管理器去管理token-server的生命周期，如果在容器环境下，如docker swarm/k8s，设置服务/容器失败重启就可以了。另外，access token的消费方也建议根据`expires_in`来合理的缓存之，这样可以避免频繁请求token-server, 也能应对部分token-server挂掉的场景（只要token-server能很快恢复）。
 
 ## License
 
